@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tech Lab · Dashboard</title>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAs7e9JabOIfBViinpdNZb_zTXolhNkWG4",
+    authDomain: "techlab-dashboard.firebaseapp.com",
+    databaseURL: "https://techlab-dashboard-default-rtdb.firebaseio.com",
+    projectId: "techlab-dashboard",
+    storageBucket: "techlab-dashboard.firebasestorage.app",
+    messagingSenderId: "802068438914",
+    appId: "1:802068438914:web:e3676c13cd74572507799b"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  window.__fb = { db, ref, get, set, onValue };
+  window.dispatchEvent(new Event('firebase-ready'));
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070b14; --bg-2:#0a0f1c; --panel:#0f1826; --panel-2:#111d2f;
+    --line:#1b2740; --line-soft:#141f34;
+    --text:#e7ecf5; --text-dim:#7f8fac; --text-dimmer:#55637f;
+    --cyan:#22d3ee; --violet:#a78bfa; --orange:#fb923c; --lime:#a3e635;
+    --amber:#fbbf24; --rose:#fb7185; --blue:#60a5fa; --red:#f87171;
+    --green:#34d399; --teal:#2dd4bf; --grey:#64748b;
+    --sky:#38bdf8; --purple:#c084fc;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #0d1626 0%, transparent 60%),
+      radial-gradient(900px 500px at 100% 0%, #0c1420 0%, transparent 55%),
+      var(--bg);
+    color:var(--text); font-family:'Inter',sans-serif;
+    padding: 24px 18px 60px;
+  }
+  .wrap{ max-width:1220px; margin:0 auto; }
+
+  header{
+    position:relative; border:1px solid var(--line); border-radius:14px;
+    background:linear-gradient(135deg, var(--panel) 0%, var(--bg-2) 100%);
+    padding:22px 24px; overflow:hidden; margin-bottom:18px;
+    display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap;
+  }
+  header::before{
+    content:""; position:absolute; inset:0;
+    background-image:linear-gradient(var(--line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size:26px 26px;
+    mask-image: radial-gradient(650px 260px at 85% 20%, #000 0%, transparent 75%);
+    opacity:.6;
+  }
+  .brand{ position:relative; z-index:1; }
+  .eyebrow{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.18em; color:var(--cyan); display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .eyebrow .dot{ width:7px; height:7px; border-radius:50%; background:var(--cyan); box-shadow:0 0 8px 2px rgba(34,211,238,.7); animation:pulse 1.8s ease-in-out infinite; }
+  h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(22px,3vw,30px); margin:0; letter-spacing:-.01em; }
+  h1 span{ color:var(--cyan); }
+  @keyframes pulse{ 0%,100%{opacity:1;} 50%{opacity:.35;} }
+  @media (prefers-reduced-motion: reduce){ .eyebrow .dot{ animation:none; } }
+
+  .tabs{ position:relative; z-index:1; display:flex; gap:6px; background:var(--bg-2); border:1px solid var(--line); border-radius:11px; padding:4px; }
+  .tabs button{
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; letter-spacing:.08em; text-transform:uppercase;
+    background:transparent; border:none; color:var(--text-dim); padding:9px 16px; border-radius:8px; cursor:pointer;
+    transition:.15s;
+  }
+  .tabs button.active{ background:var(--panel-2); color:var(--cyan); box-shadow: inset 0 0 0 1px var(--line); }
+  .tabs button:hover:not(.active){ color:var(--text); }
+
+  .view{ display:none; }
+  .view.active{ display:block; }
+
+  .status{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dimmer); margin-bottom:14px; display:flex; align-items:center; gap:7px; }
+  .status .led{ width:6px; height:6px; border-radius:50%; background:var(--green); box-shadow:0 0 6px 2px rgba(52,211,153,.6); }
+  .status.err .led{ background:var(--red); box-shadow:0 0 6px 2px rgba(248,113,113,.6); }
+
+  .weekbar{
+    display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;
+    border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:10px 14px; margin-bottom:16px;
+  }
+  .week-nav{ display:flex; align-items:center; gap:8px; }
+  .week-nav button{
+    width:28px; height:28px; border-radius:7px; border:1px solid var(--line); background:var(--panel-2); color:var(--text-dim);
+    cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:13px;
+  }
+  .week-nav button:hover:not(:disabled){ border-color:var(--cyan); color:var(--cyan); }
+  .week-nav button:disabled{ opacity:.35; cursor:not-allowed; }
+  .week-nav select{
+    font-family:'JetBrains Mono',monospace; font-size:12.5px; font-weight:700; letter-spacing:.04em;
+    background:var(--panel-2); border:1px solid var(--line); border-radius:7px; color:var(--text); padding:6px 10px; cursor:pointer;
+  }
+  .pdf-btn{
+    font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.05em; text-transform:uppercase; font-weight:700;
+    background:var(--cyan); color:#04101c; border:none; border-radius:8px; padding:8px 14px; cursor:pointer;
+    display:flex; align-items:center; gap:7px;
+  }
+  .pdf-btn svg{ width:14px; height:14px; }
+  .pdf-btn:hover{ filter:brightness(1.08); }
+
+  .print-report{ display:none; }
+
+  @media print{
+    body{ background:#fff !important; color:#111 !important; padding:0; }
+    .wrap > *{ display:none !important; }
+    .print-report{ display:block !important; max-width:100%; }
+    .print-report h1{ font-family:'Space Grotesk',sans-serif; font-size:22px; margin:0 0 2px; color:#0a0f1c; }
+    .print-report .psub{ font-family:'JetBrains Mono',monospace; font-size:11px; color:#555; margin-bottom:18px; }
+    .print-report h2{ font-family:'Space Grotesk',sans-serif; font-size:15px; margin:22px 0 8px; color:#0a0f1c; border-bottom:1px solid #ccc; padding-bottom:5px; }
+    .print-report table{ width:100%; border-collapse:collapse; font-size:12px; }
+    .print-report th, .print-report td{ text-align:left; padding:6px 8px; border-bottom:1px solid #ddd; }
+    .print-report th{ font-family:'JetBrains Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.05em; color:#666; }
+    .print-report .pnote{ font-size:11px; color:#666; margin-top:6px; }
+  }
+
+  /* ===== MARCADOR (kids) ===== */
+  .teams{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:14px; margin-bottom:22px; }
+  .team{
+    border-radius:14px; border:1px solid var(--line);
+    background:linear-gradient(160deg, color-mix(in srgb, var(--tc) 16%, var(--panel-2)) 0%, var(--panel-2) 70%);
+    padding:18px 18px 16px; position:relative; overflow:hidden;
+  }
+  .team::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--tc); }
+  .team .rank{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--tc); letter-spacing:.14em; margin-bottom:4px; }
+  .team h3{ font-family:'Space Grotesk',sans-serif; font-size:19px; font-weight:700; margin:0 0 10px; color:var(--text); }
+  .team .coins{ font-family:'JetBrains Mono',monospace; font-weight:800; font-size:32px; color:var(--tc); line-height:1; }
+  .team .coins small{ font-size:12px; font-weight:500; color:var(--text-dimmer); margin-left:6px; }
+  .bar{ height:7px; border-radius:99px; background:var(--line-soft); margin:12px 0 12px; overflow:hidden; }
+  .bar > i{ display:block; height:100%; background:var(--tc); border-radius:99px; transition:width .4s ease; }
+  .badges{ display:flex; flex-wrap:wrap; gap:6px; }
+  .badge{
+    width:28px; height:28px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    border:1px solid var(--line); background:var(--bg-2); color:var(--text-dimmer); position:relative;
+  }
+  .badge svg{ width:14px; height:14px; }
+  .badge.on{ color:var(--edge); border-color:color-mix(in srgb, var(--edge) 50%, var(--line)); background:color-mix(in srgb, var(--edge) 14%, var(--bg-2)); }
+  .badge.perfecto{ box-shadow:0 0 0 2px color-mix(in srgb, var(--edge) 55%, transparent); }
+
+  .legend-row{ display:flex; flex-wrap:wrap; gap:14px; font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dimmer); margin-top:4px; }
+  .legend-row span{ display:flex; align-items:center; gap:6px; }
+  .legend-row i{ width:9px; height:9px; border-radius:3px; display:inline-block; }
+
+  /* ===== SEGUIMIENTO (teacher) ===== */
+  .table-wrap{ border:1px solid var(--line); border-radius:14px; background:var(--panel); overflow-x:auto; }
+  table{ border-collapse:collapse; width:100%; min-width:720px; }
+  thead th{
+    font-family:'Space Grotesk',sans-serif; font-size:12.5px; font-weight:600; color:var(--text);
+    text-align:center; padding:12px 10px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--panel);
+  }
+  thead th:first-child{ text-align:left; }
+  tbody td{ padding:8px 10px; border-bottom:1px solid var(--line-soft); text-align:center; }
+  .row-head{
+    display:flex; align-items:center; gap:9px; text-align:left; min-width:210px;
+  }
+  .row-head .icon{ width:20px; height:20px; flex-shrink:0; color:var(--edge); }
+  .row-head .icon svg{ width:100%; height:100%; }
+  .row-head .name{ font-size:12.5px; font-weight:600; color:var(--text); }
+  .row-head .meta{ font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-dimmer); }
+  .cell-btn{
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase;
+    border:1px solid var(--line); background:var(--panel-2); color:var(--text-dimmer);
+    padding:7px 4px; border-radius:8px; cursor:pointer; width:100%; min-width:88px; transition:.12s;
+  }
+  .cell-btn:hover{ border-color:var(--text-dimmer); }
+  .cell-btn.basico{ color:var(--amber); border-color:color-mix(in srgb, var(--amber) 45%, var(--line)); background:color-mix(in srgb, var(--amber) 10%, var(--panel-2)); }
+  .cell-btn.bien{ color:var(--blue); border-color:color-mix(in srgb, var(--blue) 45%, var(--line)); background:color-mix(in srgb, var(--blue) 10%, var(--panel-2)); }
+  .cell-btn.perfecto{ color:var(--green); border-color:color-mix(in srgb, var(--green) 55%, var(--line)); background:color-mix(in srgb, var(--green) 14%, var(--panel-2)); }
+  .cell-btn.hecho{ color:var(--lime); border-color:color-mix(in srgb, var(--lime) 45%, var(--line)); background:color-mix(in srgb, var(--lime) 10%, var(--panel-2)); }
+  .section-sep td{ padding:10px 10px 4px; border-bottom:none; }
+  .section-sep .lbl{ font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-dimmer); }
+
+  .note{ border:1px solid var(--line); background:var(--panel); border-radius:10px; padding:12px 16px; font-size:12px; line-height:1.55; color:var(--text-dim); margin-top:14px; }
+  .note b{ color:var(--text-dim); }
+
+  .reset{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--text-dimmer); background:none; border:1px solid var(--line); border-radius:8px; padding:7px 12px; cursor:pointer; margin-top:14px; }
+  .reset:hover{ color:var(--red); border-color:color-mix(in srgb, var(--red) 40%, var(--line)); }
+
+  /* ===== HABITACIÓN (inspección) ===== */
+  .rooms{ display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr)); gap:14px; }
+  .room-card{ border-radius:14px; border:1px solid var(--line); background:var(--panel-2); padding:16px 18px 18px; position:relative; overflow:hidden; }
+  .room-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--tc); }
+  .room-card h3{ font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:700; margin:0 0 12px; color:var(--text); }
+  .criterion{ margin-bottom:12px; }
+  .criterion .clabel{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dimmer); margin-bottom:6px; display:block; }
+  .levels{ display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+  .lvl-btn{ font-family:'JetBrains Mono',monospace; font-size:10px; border:1px solid var(--line); background:var(--bg-2); color:var(--text-dimmer); padding:8px 2px; border-radius:7px; cursor:pointer; line-height:1.3; text-align:center; }
+  .lvl-btn b{ display:block; font-size:13px; }
+  .lvl-btn:hover{ border-color:var(--text-dimmer); }
+  .lvl-btn.sel-1{ color:var(--red); border-color:var(--red); background:color-mix(in srgb, var(--red) 14%, var(--bg-2)); }
+  .lvl-btn.sel-2{ color:var(--amber); border-color:var(--amber); background:color-mix(in srgb, var(--amber) 14%, var(--bg-2)); }
+  .lvl-btn.sel-3{ color:var(--blue); border-color:var(--blue); background:color-mix(in srgb, var(--blue) 14%, var(--bg-2)); }
+  .lvl-btn.sel-4{ color:var(--green); border-color:var(--green); background:color-mix(in srgb, var(--green) 14%, var(--bg-2)); }
+  .room-log{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-dimmer); margin-top:8px; }
+
+  /* ===== PODIO ===== */
+  .podium-wrap{ margin-bottom:18px; }
+  .winner{
+    position:relative; overflow:hidden;
+    border-radius:16px; border:1px solid color-mix(in srgb, var(--wc) 45%, var(--line));
+    background:
+      radial-gradient(500px 220px at 15% 0%, color-mix(in srgb, var(--wc) 22%, transparent), transparent 70%),
+      linear-gradient(135deg, var(--panel) 0%, var(--bg-2) 100%);
+    padding:22px 26px;
+    display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--wc) 20%, transparent), 0 18px 40px -18px color-mix(in srgb, var(--wc) 60%, transparent);
+  }
+  .winner .trophy{
+    width:64px; height:64px; flex-shrink:0; color:var(--wc);
+    filter: drop-shadow(0 0 12px color-mix(in srgb, var(--wc) 70%, transparent));
+    animation: trophy-float 2.6s ease-in-out infinite;
+  }
+  .winner .trophy svg{ width:100%; height:100%; }
+  @keyframes trophy-float{ 0%,100%{ transform:translateY(0) rotate(-2deg);} 50%{ transform:translateY(-5px) rotate(2deg);} }
+  @media (prefers-reduced-motion: reduce){ .winner .trophy{ animation:none; } }
+  .winner .info{ flex:1; min-width:180px; }
+  .winner .label{ font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--wc); display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+  .winner .label .dot{ width:6px; height:6px; border-radius:50%; background:var(--wc); box-shadow:0 0 8px 2px color-mix(in srgb, var(--wc) 70%, transparent); }
+  .winner .name{ font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:clamp(24px,3.6vw,34px); color:var(--text); line-height:1.05; }
+  .winner .sub{ font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--text-dim); margin-top:4px; }
+  .winner .score{ text-align:right; }
+  .winner .score .n{ font-family:'JetBrains Mono',monospace; font-weight:800; font-size:clamp(38px,5vw,56px); color:var(--wc); line-height:1; }
+  .winner .score .u{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dimmer); letter-spacing:.1em; text-transform:uppercase; }
+  .winner.tie .name{ font-size:clamp(18px,2.4vw,24px); }
+
+  .rank-strip{ display:flex; gap:8px; overflow-x:auto; margin-top:10px; padding-bottom:2px; }
+  .rchip{
+    flex:0 0 auto; min-width:132px;
+    border:1px solid var(--line); border-radius:10px; background:var(--panel);
+    padding:9px 12px; display:flex; align-items:center; gap:8px;
+  }
+  .rchip .pos{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dimmer); width:16px; }
+  .rchip .dotc{ width:8px; height:8px; border-radius:3px; flex-shrink:0; background:var(--rc); }
+  .rchip .rname{ font-size:11.5px; font-weight:600; color:var(--text); flex:1; }
+  .rchip .rcoins{ font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700; color:var(--rc); }
+
+  .count-picker{ display:flex; align-items:center; gap:8px; }
+  .count-picker .lbl{ font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.06em; color:var(--text-dimmer); text-transform:uppercase; }
+  .count-btn{
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; font-weight:700;
+    width:28px; height:28px; border-radius:7px; border:1px solid var(--line); background:var(--panel-2); color:var(--text-dim); cursor:pointer;
+  }
+  .count-btn.active{ background:var(--cyan); color:#04101c; border-color:var(--cyan); }
+  .count-btn:hover:not(.active){ border-color:var(--text-dimmer); }
+
+  /* ===== BONUS ===== */
+  .bonus-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px,1fr)); gap:12px; }
+  .bonus-card{ border-radius:12px; border:1px solid var(--line); background:var(--panel-2); padding:14px 16px; position:relative; overflow:hidden; }
+  .bonus-card::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--tc); }
+  .bonus-card h4{ font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:600; margin:0 0 2px; color:var(--text); }
+  .bonus-card .btotal{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--tc); margin-bottom:10px; }
+  .quick-add{ display:flex; gap:5px; margin-bottom:8px; }
+  .quick-add button{ font-family:'JetBrains Mono',monospace; font-size:11px; border:1px solid var(--line); background:var(--bg-2); color:var(--text-dim); padding:6px 0; flex:1; border-radius:7px; cursor:pointer; }
+  .quick-add button:hover{ border-color:var(--tc); color:var(--tc); }
+  .bonus-form{ display:flex; gap:6px; }
+  .bonus-form input[type=number]{ width:58px; font-family:'JetBrains Mono',monospace; font-size:12px; background:var(--bg-2); border:1px solid var(--line); border-radius:7px; color:var(--text); padding:6px 8px; }
+  .bonus-form input[type=text]{ flex:1; min-width:0; font-family:'Inter',sans-serif; font-size:12px; background:var(--bg-2); border:1px solid var(--line); border-radius:7px; color:var(--text); padding:6px 8px; }
+  .bonus-form button{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; background:var(--tc); color:#04101c; border:none; border-radius:7px; padding:6px 10px; cursor:pointer; }
+  .bonus-log{ font-family:'JetBrains Mono',monospace; font-size:9.5px; color:var(--text-dimmer); margin-top:9px; max-height:70px; overflow-y:auto; }
+  .bonus-log div{ padding:2px 0; border-top:1px dashed var(--line-soft); }
+  .bonus-log div:first-child{ border-top:none; }
+
+  /* ===== EVALUACIÓN CURRICULAR (independiente del marcador) ===== */
+  .roster-box{ border:1px solid var(--line); border-radius:12px; background:var(--panel); padding:14px 16px; margin-bottom:18px; }
+  .roster-box textarea{
+    width:100%; min-height:90px; resize:vertical; font-family:'JetBrains Mono',monospace; font-size:12px;
+    background:var(--bg-2); border:1px solid var(--line); border-radius:8px; color:var(--text); padding:10px 12px; margin:8px 0 10px;
+  }
+  .save-roster-btn{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    background:var(--cyan); color:#04101c; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; }
+  .save-roster-btn:hover{ filter:brightness(1.08); }
+  .taller-block{ border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:16px 18px 14px; margin-bottom:16px; }
+  .taller-block h3{ font-family:'Space Grotesk',sans-serif; font-size:15px; font-weight:700; margin:0 2px 2px; color:var(--text); }
+  .taller-block .area-sub{ font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-dimmer); margin:0 2px 12px; }
+  .eval-table{ width:100%; border-collapse:collapse; }
+  .eval-table th{ font-family:'JetBrains Mono',monospace; font-size:9.5px; letter-spacing:.03em; color:var(--text-dimmer); text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); vertical-align:bottom; }
+  .eval-table th.crit-h{ max-width:130px; }
+  .eval-table td{ padding:5px 6px; border-bottom:1px solid var(--line-soft); }
+  .eval-table td.alumno-cell{ font-size:12px; color:var(--text); white-space:nowrap; }
+  .lvl-cell-btn{
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700; letter-spacing:.02em;
+    border:1px solid var(--line); background:var(--panel-2); color:var(--text-dimmer);
+    padding:6px 2px; border-radius:7px; cursor:pointer; width:100%; min-width:64px; text-align:center; line-height:1.3;
+  }
+  .lvl-cell-btn:hover{ border-color:var(--text-dimmer); }
+  .lvl-cell-btn.nc{ color:var(--red); border-color:color-mix(in srgb, var(--red) 45%, var(--line)); background:color-mix(in srgb, var(--red) 12%, var(--panel-2)); }
+  .lvl-cell-btn.ep{ color:var(--amber); border-color:color-mix(in srgb, var(--amber) 45%, var(--line)); background:color-mix(in srgb, var(--amber) 12%, var(--panel-2)); }
+  .lvl-cell-btn.con{ color:var(--blue); border-color:color-mix(in srgb, var(--blue) 45%, var(--line)); background:color-mix(in srgb, var(--blue) 12%, var(--panel-2)); }
+  .lvl-cell-btn.av{ color:var(--green); border-color:color-mix(in srgb, var(--green) 55%, var(--line)); background:color-mix(in srgb, var(--green) 15%, var(--panel-2)); }
+  .export-btn{ font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    background:none; color:var(--text-dim); border:1px solid var(--line); border-radius:8px; padding:8px 14px; cursor:pointer; margin-top:6px; }
+  .export-btn:hover{ border-color:var(--cyan); color:var(--cyan); }
+
+  .mini-lvls{ display:flex; gap:3px; justify-content:center; }
+  .mini-lvl-btn{
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; font-weight:700;
+    width:23px; height:23px; border-radius:5px; border:1px solid var(--line);
+    background:var(--panel-2); color:var(--text-dimmer); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:.1s; flex-shrink:0;
+  }
+  .mini-lvl-btn:hover{ border-color:var(--text-dimmer); color:var(--text-dim); }
+  .mini-lvl-btn.active.nc{ background:color-mix(in srgb, var(--red) 22%, var(--panel-2)); color:var(--red); border-color:var(--red); }
+  .mini-lvl-btn.active.ep{ background:color-mix(in srgb, var(--amber) 22%, var(--panel-2)); color:var(--amber); border-color:var(--amber); }
+  .mini-lvl-btn.active.con{ background:color-mix(in srgb, var(--blue) 22%, var(--panel-2)); color:var(--blue); border-color:var(--blue); }
+  .mini-lvl-btn.active.av{ background:color-mix(in srgb, var(--green) 26%, var(--panel-2)); color:var(--green); border-color:var(--green); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="eyebrow"><span class="dot"></span>TECH LAB · CRIE DE ZAMORA</div>
+      <h1>Dashboard del <span>Proyecto</span></h1>
+    </div>
+    <div class="tabs">
+      <button id="tab-marcador" class="active">Marcador</button>
+      <button id="tab-seguimiento">Seguimiento</button>
+      <button id="tab-habitacion">Habitación</button>
+      <button id="tab-evaluacion">Evaluación</button>
+    </div>
+  </header>
+
+  <div id="status" class="status"><span class="led"></span><span id="status-text">Cargando progreso…</span></div>
+  <div id="weekbar" class="weekbar"></div>
+
+  <!-- ===================== MARCADOR ===================== -->
+  <div id="view-marcador" class="view active">
+    <div class="teams" id="teams-grid"></div>
+    <div class="legend-row">
+      <span><i style="background:var(--amber)"></i>Básico · 10</span>
+      <span><i style="background:var(--blue)"></i>Bien · 20</span>
+      <span><i style="background:var(--green)"></i>Perfecto · 30</span>
+      <span>CRIEcoins por taller (8 talleres puntuables · máximo 240)</span>
+    </div>
+  </div>
+
+  <!-- ===================== SEGUIMIENTO ===================== -->
+  <div id="view-seguimiento" class="view">
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Taller</th>
+            <th>Nexo</th>
+            <th>Quantum</th>
+            <th>Síntesis</th>
+            <th>Horizonte</th>
+            <th>Vector</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+    <div class="note"><b>Cómo funciona:</b> clic en una celda para avanzar el nivel de logro (Pendiente → Básico → Bien → Perfecto → Pendiente). En Radar de Misión y Salida solo se registra asistencia (Pendiente → Hecho), no llevan CRIEcoins. Los cambios se guardan solos y los ve cualquiera que abra este panel.</div>
+
+    <div style="margin-top:22px;">
+      <div class="sec-head" style="border-bottom:1px solid var(--line); padding-bottom:10px; margin-bottom:12px;">
+        <h2 style="font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; margin:0; color:var(--text);">CRIEcoins extra</h2>
+      </div>
+      <div class="legend-row" style="margin-bottom:12px;">Para una acción puntual que merezca reconocimiento — ayudar a otro equipo, una idea destacada, lo que sea. Se suma directamente al total del equipo.</div>
+      <div class="bonus-grid" id="bonus-grid"></div>
+    </div>
+
+    <button class="reset" id="reset-btn">Reiniciar todo el progreso</button>
+  </div>
+
+  <!-- ===================== HABITACIÓN ===================== -->
+  <div id="view-habitacion" class="view">
+    <div class="legend-row" style="margin-bottom:6px;">
+      <span><i style="background:var(--red)"></i>1 · Mal</span>
+      <span><i style="background:var(--amber)"></i>2 · Regular</span>
+      <span><i style="background:var(--blue)"></i>3 · Bien</span>
+      <span><i style="background:var(--green)"></i>4 · Perfecta</span>
+    </div>
+    <div class="legend-row" style="margin-bottom:14px;">
+      <span>Chequeo diario: martes, miércoles y jueves justo después de la ducha · viernes después de hacer las camas y las maletas</span>
+      <span>Liga independiente de los equipos del Tech Lab</span>
+    </div>
+    <div id="room-count-picker" class="legend-row" style="margin-bottom:14px;"></div>
+    <div id="room-rank"></div>
+    <div class="rooms" id="rooms-grid"></div>
+  </div>
+
+  <!-- ===================== EVALUACIÓN CURRICULAR ===================== -->
+  <div id="view-evaluacion" class="view">
+    <div class="legend-row" style="margin-bottom:14px;">
+      <span>Independiente del Marcador · no usa CRIEcoins ni afecta a los equipos</span>
+      <span>Talleres del miércoles · Decreto 38/2022, Sexto Curso</span>
+    </div>
+    <div class="roster-box">
+      <div class="area-sub">LISTA DE ALUMNOS DE ESTA SEMANA (uno por línea)</div>
+      <textarea id="eval-roster-input" placeholder="Nombre Apellido&#10;Nombre Apellido&#10;..."></textarea>
+      <button class="save-roster-btn" id="eval-save-roster">Guardar lista</button>
+    </div>
+    <div id="eval-talleres-wrap"></div>
+    <div class="legend-row" style="margin:4px 0 10px;">
+      <span><i style="background:var(--red)"></i>No conseguido · 3</span>
+      <span><i style="background:var(--amber)"></i>En proceso · 6</span>
+      <span><i style="background:var(--blue)"></i>Conseguido · 8</span>
+      <span><i style="background:var(--green)"></i>Avanzado · 10</span>
+      <span>Clic directo en el nivel · tocar el mismo lo borra</span>
+    </div>
+    <button class="export-btn" id="eval-export-btn">Exportar notas (CSV)</button>
+    <div class="note" style="margin-top:10px;"><b>Cómo funciona:</b> los números son el valor por defecto de cada nivel dentro del rango acordado. Al exportar obtienes un CSV con alumno, taller, criterio, fila del Excel y nota — listo para pegarlo en el chat de Claude y que rellene el Excel oficial.</div>
+  </div>
+
+  <div class="print-report" id="print-report"></div>
+
+  <div id="eval-pin-overlay" style="display:none; position:fixed; inset:0; background:rgba(4,8,16,.75); z-index:999; align-items:center; justify-content:center;">
+    <div style="background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:24px 26px; width:260px; text-align:center;">
+      <div style="font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; margin-bottom:12px;">Código de acceso</div>
+      <input id="eval-pin-input" type="password" inputmode="numeric" style="width:100%; box-sizing:border-box; font-family:'JetBrains Mono',monospace; font-size:16px; text-align:center; letter-spacing:.2em; background:var(--bg-2); border:1px solid var(--line); border-radius:8px; color:var(--text); padding:10px; margin-bottom:6px;" />
+      <div id="eval-pin-error" style="color:var(--red); font-size:11px; min-height:14px; margin-bottom:10px;"></div>
+      <button id="eval-pin-ok" class="save-roster-btn" style="width:100%;">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TROPHY = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 4h8v4a4 4 0 01-8 0V4z" stroke-linejoin="round"/><path d="M8 5H5a3 3 0 003 3M16 5h3a3 3 0 01-3 3"/><path d="M10 12v2a2 2 0 002 2 2 2 0 002-2v-2"/><path d="M9 20h6M12 16v4"/></svg>';
+
+const ICONS = {
+  radar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 L18 6"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  checklist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12l2 2 4-4M8 17h5"/></svg>',
+  radio: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="15" r="5"/><path d="M12 10V4M9 4h6M6 15a6 6 0 0112 0"/></svg>',
+  hike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 19l6-11 3 5 2-3 7 9" stroke-linejoin="round" stroke-linecap="round"/><circle cx="9" cy="4" r="1.6" fill="currentColor" stroke="none"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5 20 20M8 10h4"/></svg>',
+  dumbbell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 9v6M20 9v6M7 12h10M2 10.5v3M22 10.5v3"/></svg>',
+  bike: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="6" cy="17" r="3.2"/><circle cx="18" cy="17" r="3.2"/><path d="M6 17l4-8h5l3 8M10 9H8m3 0 3 5"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/><circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none"/></svg>',
+  flask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 3h6M10 3v6l-5.5 9.5A1.5 1.5 0 005.8 21h12.4a1.5 1.5 0 001.3-2.5L14 9V3"/><path d="M7.5 15h9"/></svg>',
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>'
+};
+
+const TEAMS = [
+  {id:'nexo', name:'Nexo', color:'--sky'},
+  {id:'quantum', name:'Quantum', color:'--purple'},
+  {id:'sintesis', name:'Síntesis', color:'--amber'},
+  {id:'horizonte', name:'Horizonte', color:'--rose'},
+  {id:'vector', name:'Vector', color:'--lime'},
+];
+
+// Talleres puntuables (llevan CRIEcoins por nivel de logro)
+const GRADED = [
+  {id:'protocolo', name:'Protocolo de Autonomía', meta:'Cama y ducha', icon:'checklist', color:'--violet'},
+  {id:'transmision', name:'Sala de Transmisión', meta:'Radio', icon:'radio', color:'--orange'},
+  {id:'caza', name:'Caza de Datos', meta:'Gymkana de lectura', icon:'search', color:'--amber'},
+  {id:'carga', name:'Carga Física', meta:'Crossfit', icon:'dumbbell', color:'--rose'},
+  {id:'torre', name:'Torre de Control', meta:'Educación vial', icon:'bike', color:'--blue'},
+  {id:'bloqueo', name:'Bloqueo Crítico', meta:'Escaperoom · Barbecho', icon:'lock', color:'--red'},
+  {id:'laboratorio', name:'Laboratorio de Anomalías', meta:'Experimentos', icon:'flask', color:'--green'},
+  {id:'auditoria', name:'Auditoría de Sistemas', meta:'Evaluación global', icon:'shield', color:'--teal'},
+];
+
+// Talleres de asistencia (sin CRIEcoins)
+const ATTENDANCE = [
+  {id:'radar', name:'Radar de Misión', meta:'Vista global', icon:'radar', color:'--cyan'},
+  {id:'salida', name:'Salida', meta:'Excursión', icon:'hike', color:'--lime'},
+];
+
+// Conexión a Firebase Realtime Database (sustituye a window.storage / capacidades de Claude)
+function waitForFirebase(){
+  if(window.__fb) return Promise.resolve(window.__fb);
+  return new Promise(resolve => {
+    window.addEventListener('firebase-ready', () => resolve(window.__fb), { once:true });
+  });
+}
+let fb = null;
+async function initFirebase(){
+  if(fb) return fb;
+  fb = await waitForFirebase();
+  return fb;
+}
+function fbRef(path){ return fb.ref(fb.db, path); }
+
+const COINS = { pendiente:0, basico:10, bien:20, perfecto:30 };
+const GRADED_CYCLE = ['pendiente','basico','bien','perfecto'];
+const ATT_CYCLE = ['pendiente','hecho'];
+const TOTAL_WEEKS = 24;
+const META_KEY = 'techlab-meta-v1';
+const weekKey = n => `weeks/S${n}`;
+let currentWeek = 1;
+
+const LEVELS = [{v:1,label:'Mal'},{v:2,label:'Regular'},{v:3,label:'Bien'},{v:4,label:'Perfecta'}];
+const DAYS = [
+  {id:'mar', label:'Martes'},
+  {id:'mie', label:'Miércoles'},
+  {id:'jue', label:'Jueves'},
+  {id:'vie', label:'Viernes'},
+];
+const ROOM_COLORS = ['--cyan','--violet','--orange','--lime','--amber','--rose','--blue','--teal'];
+const ROOMS = Array.from({length:8}, (_,i)=> ({id:'room'+(i+1), name:'Habitación '+(i+1), color: ROOM_COLORS[i]}));
+let state = null;
+
+function defaultState(){
+  const s = { rooms:{}, activeRooms: 8 };
+  TEAMS.forEach(t=>{
+    s[t.id] = { bonus: { total:0, log:[] } };
+    GRADED.forEach(w=> s[t.id][w.id] = 'pendiente');
+    ATTENDANCE.forEach(w=> s[t.id][w.id] = 'pendiente');
+  });
+  ROOMS.forEach(r=>{
+    s.rooms[r.id] = {};
+    DAYS.forEach(d=> s.rooms[r.id][d.id] = null);
+  });
+  return s;
+}
+
+function normalizeState(s){
+  if(!s.rooms) s.rooms = {};
+  if(!s.activeRooms) s.activeRooms = 8;
+  TEAMS.forEach(t=>{
+    if(!s[t.id]) s[t.id] = {};
+    if(!s[t.id].bonus) s[t.id].bonus = { total:0, log:[] };
+    GRADED.forEach(w=>{ if(!s[t.id][w.id]) s[t.id][w.id] = 'pendiente'; });
+    ATTENDANCE.forEach(w=>{ if(!s[t.id][w.id]) s[t.id][w.id] = 'pendiente'; });
+  });
+  ROOMS.forEach(r=>{
+    if(!s.rooms[r.id]) s.rooms[r.id] = {};
+    DAYS.forEach(d=>{ if(!(d.id in s.rooms[r.id])) s.rooms[r.id][d.id] = null; });
+  });
+  return s;
+}
+
+function setStatus(text, err){
+  document.getElementById('status-text').textContent = text;
+  document.getElementById('status').classList.toggle('err', !!err);
+}
+
+let weekUnsub = null, metaUnsub = null;
+
+async function loadMeta(){
+  try{
+    const snap = await fb.get(fbRef('meta/app'));
+    const meta = snap.exists() ? snap.val() : null;
+    currentWeek = (meta && meta.currentWeek >= 1 && meta.currentWeek <= TOTAL_WEEKS) ? meta.currentWeek : 1;
+  }catch(e){
+    currentWeek = 1;
+  }
+}
+
+async function saveMeta(){
+  try{ await fb.set(fbRef('meta/app'), {currentWeek}); }catch(e){ /* no crítico */ }
+}
+
+function subscribeWeekState(){
+  if(weekUnsub) weekUnsub();
+  weekUnsub = fb.onValue(fbRef(weekKey(currentWeek)), (snap) => {
+    state = snap.exists() ? normalizeState(snap.val()) : defaultState();
+    setStatus(`Semana ${currentWeek} · progreso sincronizado`);
+    render();
+  }, (e) => {
+    state = state || defaultState();
+    setStatus(`Semana ${currentWeek} · sin conexión con el guardado — los cambios no se conservarán`, true);
+  });
+}
+
+function subscribeMeta(){
+  if(metaUnsub) metaUnsub();
+  metaUnsub = fb.onValue(fbRef('meta/app'), (snap) => {
+    const meta = snap.exists() ? snap.val() : null;
+    const remoteWeek = (meta && meta.currentWeek >= 1 && meta.currentWeek <= TOTAL_WEEKS) ? meta.currentWeek : 1;
+    if(remoteWeek !== currentWeek){
+      currentWeek = remoteWeek;
+      subscribeWeekState();
+      subscribeEvalState();
+      renderWeekbar();
+    }
+  });
+}
+
+async function loadState(){
+  await initFirebase();
+  await loadMeta();
+  renderWeekbar();
+  subscribeWeekState();
+  subscribeMeta();
+  subscribeEvalState();
+}
+
+async function saveState(){
+  try{
+    await fb.set(fbRef(weekKey(currentWeek)), JSON.parse(JSON.stringify(state)));
+    setStatus(`Semana ${currentWeek} · progreso sincronizado`);
+  }catch(e){
+    setStatus('No se pudo guardar el último cambio', true);
+  }
+}
+
+async function switchWeek(n){
+  if(n < 1 || n > TOTAL_WEEKS) return;
+  currentWeek = n;
+  await saveMeta();
+  subscribeWeekState();
+  subscribeEvalState();
+  renderWeekbar();
+}
+
+function renderWeekbar(){
+  const bar = document.getElementById('weekbar');
+  const options = Array.from({length:TOTAL_WEEKS}, (_,i)=> i+1)
+    .map(n=> `<option value="${n}" ${n===currentWeek?'selected':''}>Semana ${n}</option>`).join('');
+  bar.innerHTML = `
+    <div class="week-nav">
+      <button id="week-prev" ${currentWeek<=1?'disabled':''}>‹</button>
+      <select id="week-select">${options}</select>
+      <button id="week-next" ${currentWeek>=TOTAL_WEEKS?'disabled':''}>›</button>
+    </div>
+    <button class="pdf-btn" id="pdf-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>Descargar PDF</button>
+  `;
+  document.getElementById('week-prev').addEventListener('click', ()=> switchWeek(currentWeek-1));
+  document.getElementById('week-next').addEventListener('click', ()=> switchWeek(currentWeek+1));
+  document.getElementById('week-select').addEventListener('change', (e)=> switchWeek(Number(e.target.value)));
+  document.getElementById('pdf-btn').addEventListener('click', ()=>{ renderPrintReport(); window.print(); });
+}
+
+function coinsFor(teamId){
+  return GRADED.reduce((sum,w)=> sum + COINS[state[teamId][w.id]], 0) + state[teamId].bonus.total;
+}
+
+function renderMarcador(){
+  const grid = document.getElementById('teams-grid');
+  const totals = TEAMS.map(t=>({
+    ...t,
+    wc: GRADED.reduce((sum,w)=> sum + COINS[state[t.id][w.id]], 0),
+    bc: state[t.id].bonus.total,
+  }));
+  totals.forEach(t=> t.coins = t.wc + t.bc);
+  const ranked = [...totals].sort((a,b)=> b.coins - a.coins);
+  const max = GRADED.length * 30;
+
+  grid.innerHTML = ranked.map((t,i)=>{
+    const badges = [...GRADED, ...ATTENDANCE].map(w=>{
+      const val = state[t.id][w.id];
+      const on = val !== 'pendiente';
+      const cls = 'badge' + (on ? ' on' : '') + (val==='perfecto' ? ' perfecto' : '');
+      return `<div class="${cls}" style="--edge:var(${w.color})" title="${w.name}: ${val}">${ICONS[w.icon]}</div>`;
+    }).join('');
+    const extra = t.bc !== 0 ? `<small>talleres ${t.wc}${t.bc>0?' + extra '+t.bc:' '+t.bc+' extra'}</small>` : `<small>/ ${max} CRIEcoins</small>`;
+    return `
+      <div class="team" style="--tc:var(${t.color})">
+        <div class="rank">#${i+1} EQUIPO</div>
+        <h3>${t.name}</h3>
+        <div class="coins">${t.coins}${extra}</div>
+        <div class="bar"><i style="width:${Math.min(100, (t.wc/max)*100)}%"></i></div>
+        <div class="badges">${badges}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderSeguimiento(){
+  const body = document.getElementById('table-body');
+  let html = `<tr class="section-sep"><td colspan="5" class="lbl">Talleres puntuables</td></tr>`;
+  html += GRADED.map(w=> rowHtml(w, GRADED_CYCLE)).join('');
+  html += `<tr class="section-sep"><td colspan="5" class="lbl">Asistencia (sin CRIEcoins)</td></tr>`;
+  html += ATTENDANCE.map(w=> rowHtml(w, ATT_CYCLE)).join('');
+  body.innerHTML = html;
+
+  body.querySelectorAll('.cell-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const {team, taller, cycle} = btn.dataset;
+      const cy = cycle === 'att' ? ATT_CYCLE : GRADED_CYCLE;
+      const cur = state[team][taller];
+      const next = cy[(cy.indexOf(cur)+1) % cy.length];
+      state[team][taller] = next;
+      render();
+      saveState();
+    });
+  });
+}
+
+function rowHtml(w, cycle){
+  const cycleFlag = cycle === ATT_CYCLE ? 'att' : 'graded';
+  const cells = TEAMS.map(t=>{
+    const val = state[t.id][w.id];
+    const label = val === 'pendiente' ? 'Pendiente' : val.charAt(0).toUpperCase()+val.slice(1);
+    return `<td><button class="cell-btn ${val}" data-team="${t.id}" data-taller="${w.id}" data-cycle="${cycleFlag}">${label}</button></td>`;
+  }).join('');
+  return `<tr>
+    <td><div class="row-head"><div class="icon" style="--edge:var(${w.color})">${ICONS[w.icon]}</div><div><div class="name">${w.name}</div><div class="meta">${w.meta}</div></div></div></td>
+    ${cells}
+  </tr>`;
+}
+
+function renderHabitacion(){
+  // Selector de habitaciones activas
+  const picker = document.getElementById('room-count-picker');
+  const btns = [4,5,6,7,8].map(n=> `<button class="count-btn${state.activeRooms===n?' active':''}" data-n="${n}">${n}</button>`).join('');
+  picker.innerHTML = `<span class="count-picker"><span class="lbl">Habitaciones esta semana</span>${btns}</span>`;
+  picker.querySelectorAll('.count-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      state.activeRooms = Number(btn.dataset.n);
+      render();
+      saveState();
+    });
+  });
+
+  const active = ROOMS.slice(0, state.activeRooms);
+
+  const rankBox = document.getElementById('room-rank');
+  const totals = active.map(r=>{
+    const days = state.rooms[r.id];
+    const scored = DAYS.filter(d=> days[d.id] !== null);
+    const total = scored.reduce((s,d)=> s + days[d.id], 0);
+    return {...r, total, done: scored.length};
+  }).sort((a,b)=> b.total - a.total);
+
+  const top = totals[0];
+  const tied = totals.filter(r=> r.total === top.total && top.total > 0);
+  const hasScores = top.total > 0;
+
+  let winnerHtml;
+  if(!hasScores){
+    winnerHtml = `
+      <div class="winner" style="--wc: var(--text-dimmer);">
+        <div class="trophy">${TROPHY}</div>
+        <div class="info">
+          <div class="label"><span class="dot"></span>Aún sin chequeos</div>
+          <div class="name">Esperando la primera valoración…</div>
+        </div>
+      </div>`;
+  } else if(tied.length > 1){
+    winnerHtml = `
+      <div class="winner tie" style="--wc: var(--amber);">
+        <div class="trophy">${TROPHY}</div>
+        <div class="info">
+          <div class="label"><span class="dot"></span>Empate en cabeza</div>
+          <div class="name">${tied.map(r=>r.name).join(' · ')}</div>
+          <div class="sub">${tied[0].done}/4 días evaluados</div>
+        </div>
+        <div class="score"><div class="n">${top.total}</div><div class="u">coins</div></div>
+      </div>`;
+  } else {
+    winnerHtml = `
+      <div class="winner" style="--wc: var(${top.color});">
+        <div class="trophy">${TROPHY}</div>
+        <div class="info">
+          <div class="label"><span class="dot"></span>Líder de la semana</div>
+          <div class="name">${top.name}</div>
+          <div class="sub">${top.done}/4 días evaluados</div>
+        </div>
+        <div class="score"><div class="n">${top.total}</div><div class="u">coins</div></div>
+      </div>`;
+  }
+
+  const stripHtml = totals.map((r,i)=> `
+    <div class="rchip">
+      <span class="pos">#${i+1}</span>
+      <span class="dotc" style="--rc:var(${r.color})"></span>
+      <span class="rname">${r.name}</span>
+      <span class="rcoins" style="--rc:var(${r.color})">${r.total}</span>
+    </div>`).join('');
+
+  rankBox.innerHTML = `<div class="podium-wrap">${winnerHtml}<div class="rank-strip">${stripHtml}</div></div>`;
+
+  const grid = document.getElementById('rooms-grid');
+  grid.innerHTML = active.map(r=>{
+    const days = state.rooms[r.id];
+    const daysHtml = DAYS.map(d=>{
+      const levelsHtml = LEVELS.map(l=>{
+        const sel = days[d.id] === l.v ? ` sel-${l.v}` : '';
+        const tip = sel ? 'Vuelve a pinchar para quitar esta puntuación' : `Marcar como ${l.label}`;
+        return `<button class="lvl-btn${sel}" data-room="${r.id}" data-day="${d.id}" data-val="${l.v}" title="${tip}"><b>${l.v}</b>${l.label}</button>`;
+      }).join('');
+      return `<div class="criterion"><span class="clabel">${d.label}</span><div class="levels">${levelsHtml}</div></div>`;
+    }).join('');
+    const scored = DAYS.filter(d=> days[d.id] !== null);
+    const total = scored.reduce((s,d)=> s + days[d.id], 0);
+    return `
+      <div class="room-card" style="--tc:var(${r.color})">
+        <h3>${r.name}</h3>
+        ${daysHtml}
+        <div class="room-log">Total: <b style="color:var(${r.color})">${total}</b> coins · ${scored.length}/4 días evaluados</div>
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.lvl-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const {room, day, val} = btn.dataset;
+      const current = state.rooms[room][day];
+      state.rooms[room][day] = (current === Number(val)) ? null : Number(val);
+      render();
+      saveState();
+    });
+  });
+}
+
+function renderBonus(){
+  const grid = document.getElementById('bonus-grid');
+  grid.innerHTML = TEAMS.map(t=>{
+    const b = state[t.id].bonus;
+    const logHtml = b.log.slice(-4).reverse().map(e=> `<div>${e.amount>0?'+':''}${e.amount} · ${e.reason || 'sin motivo'}</div>`).join('');
+    return `
+      <div class="bonus-card" style="--tc:var(${t.color})">
+        <h4>${t.name}</h4>
+        <div class="btotal">${b.total} coins extra${b.log.length ? ' · '+b.log.length+' registros' : ''}</div>
+        <div class="quick-add">
+          <button data-team="${t.id}" data-amount="5">+5</button>
+          <button data-team="${t.id}" data-amount="10">+10</button>
+          <button data-team="${t.id}" data-amount="20">+20</button>
+          <button data-team="${t.id}" data-amount="-5">−5</button>
+        </div>
+        <div class="bonus-form">
+          <input type="number" id="bamt-${t.id}" placeholder="±N">
+          <input type="text" id="breason-${t.id}" placeholder="motivo (opcional)">
+          <button data-team="${t.id}" data-custom="1">Sumar</button>
+        </div>
+        ${logHtml ? `<div class="bonus-log">${logHtml}</div>` : ''}
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('.quick-add button').forEach(btn=>{
+    btn.addEventListener('click', ()=> addBonus(btn.dataset.team, Number(btn.dataset.amount), ''));
+  });
+  grid.querySelectorAll('[data-custom]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const team = btn.dataset.team;
+      const amt = Number(document.getElementById('bamt-'+team).value);
+      const reason = document.getElementById('breason-'+team).value.trim();
+      if(!amt) return;
+      addBonus(team, amt, reason);
+    });
+  });
+}
+
+function addBonus(team, amount, reason){
+  state[team].bonus.total += amount;
+  state[team].bonus.log.push({amount, reason});
+  render();
+  saveState();
+}
+
+function render(){
+  renderMarcador();
+  renderSeguimiento();
+  renderBonus();
+  renderHabitacion();
+}
+
+// Tabs
+const TABS = ['marcador','seguimiento','habitacion'];
+function showTab(name){
+  TABS.forEach(n=>{
+    document.getElementById('tab-'+n).classList.toggle('active', n===name);
+    document.getElementById('view-'+n).classList.toggle('active', n===name);
+  });
+}
+TABS.forEach(n=> document.getElementById('tab-'+n).addEventListener('click', ()=> showTab(n)));
+
+function renderPrintReport(){
+  const box = document.getElementById('print-report');
+  const now = new Date();
+  const fecha = now.toLocaleDateString('es-ES', { day:'numeric', month:'long', year:'numeric' });
+
+  const teamRows = TEAMS.map(t=>{
+    const wc = GRADED.reduce((sum,w)=> sum + COINS[state[t.id][w.id]], 0);
+    const bc = state[t.id].bonus.total;
+    return { name:t.name, wc, bc, total: wc+bc };
+  }).sort((a,b)=> b.total-a.total);
+
+  const active = ROOMS.slice(0, state.activeRooms);
+  const roomRows = active.map(r=>{
+    const days = state.rooms[r.id];
+    const scored = DAYS.filter(d=> days[d.id] !== null);
+    const total = scored.reduce((s,d)=> s+days[d.id], 0);
+    return { name:r.name, total, done:scored.length };
+  }).sort((a,b)=> b.total-a.total);
+
+  const workshopRows = [...GRADED, ...ATTENDANCE].map(w=>{
+    const cells = TEAMS.map(t=>{
+      const v = state[t.id][w.id];
+      return v==='pendiente' ? '—' : v.charAt(0).toUpperCase()+v.slice(1);
+    });
+    return `<tr><td>${w.name}</td>${cells.map(c=>`<td>${c}</td>`).join('')}</tr>`;
+  }).join('');
+
+  box.innerHTML = `
+    <h1>Tech Lab — Semana ${currentWeek}</h1>
+    <div class="psub">CRIE de Zamora · generado el ${fecha}</div>
+
+    <h2>Marcador de equipos</h2>
+    <table>
+      <thead><tr><th>#</th><th>Equipo</th><th>Talleres</th><th>Extra</th><th>Total</th></tr></thead>
+      <tbody>${teamRows.map((t,i)=> `<tr><td>${i+1}</td><td>${t.name}</td><td>${t.wc}</td><td>${t.bc}</td><td>${t.total}</td></tr>`).join('')}</tbody>
+    </table>
+
+    <h2>Talleres por equipo</h2>
+    <table>
+      <thead><tr><th>Taller</th>${TEAMS.map(t=>`<th>${t.name}</th>`).join('')}</tr></thead>
+      <tbody>${workshopRows}</tbody>
+    </table>
+
+    <h2>Habitaciones (${state.activeRooms} en uso esta semana)</h2>
+    <table>
+      <thead><tr><th>#</th><th>Habitación</th><th>Días evaluados</th><th>Total coins</th></tr></thead>
+      <tbody>${roomRows.map((r,i)=> `<tr><td>${i+1}</td><td>${r.name}</td><td>${r.done}/4</td><td>${r.total}</td></tr>`).join('')}</tbody>
+    </table>
+    <div class="pnote">Habitación = liga independiente de las CRIEcoins de equipo.</div>
+  `;
+}
+
+document.getElementById('reset-btn').addEventListener('click', ()=>{
+  if(!confirm(`¿Reiniciar todo el progreso de la Semana ${currentWeek} (talleres, asistencia, habitaciones y coins extra)? Esto no se puede deshacer. Las demás semanas no se ven afectadas.`)) return;
+  state = defaultState();
+  render();
+  saveState();
+});
+
+loadState();
+
+/* ===================== EVALUACIÓN CURRICULAR (independiente) ===================== */
+const EVAL_KEY = 'techlab-eval-miercoles-S' + (typeof currentWeek !== 'undefined' ? currentWeek : 1);
+const EVAL_TALLERES = [
+  { id:'carga', nombre:'Carga Física', area:'Educación Física', criterios:[
+      { id:'ef1', label:'Autorregulación, esfuerzo y gestión emocional', fila:12 },
+      { id:'ef2', label:'Hábitos saludables (higiene, alimentación, postura)', fila:4 },
+      { id:'ef3', label:'Respeto de normas y juego limpio', fila:13 }
+  ]},
+  { id:'caligrafia', nombre:'Caligrafía + Lorca', area:'Lengua Castellana y Lit.', criterios:[
+      { id:'lc1', label:'Recursos del lenguaje literario', fila:25 },
+      { id:'lc2', label:'Producir textos con intención literaria', fila:26 }
+  ]},
+  { id:'laboratorio', nombre:'Laboratorio de Anomalías', area:'Ciencias de la Naturaleza', criterios:[
+      { id:'cn1', label:'Diseño y realización de experimentos guiados', fila:9 },
+      { id:'cn2', label:'Comparar predicción y resultado', fila:10 }
+  ]},
+  { id:'epv', nombre:'Llavero (EPV)', area:'Educación Plástica y Visual', criterios:[
+      { id:'epv1', label:'Producir obra propia con control y confianza', fila:10 },
+      { id:'epv2', label:'Expresar con creatividad y confianza', fila:11 }
+  ]}
+];
+const EVAL_NIVELES = [
+  { key:'nc',  label:'NC',  full:'No conseguido', nota:3,  cls:'nc'  },
+  { key:'ep',  label:'EP',  full:'En proceso',     nota:6,  cls:'ep'  },
+  { key:'con', label:'C',   full:'Conseguido',     nota:8,  cls:'con' },
+  { key:'av',  label:'AV',  full:'Avanzado',       nota:10, cls:'av'  }
+];
+
+let evalState = { roster: [], grades: {} }; // grades[tallerId][criterioId][alumno] = nivelKey
+
+function evalKeyForWeek(){
+  const w = (typeof currentWeek !== 'undefined' ? currentWeek : 1);
+  return 'S' + w;
+}
+
+// Los datos de evaluación se guardan de forma compartida en Firebase; el PIN de
+// la interfaz es la única barrera de acceso (no hay cuentas de usuario aquí).
+let evalUnsub = null;
+function evalPath(){
+  return 'eval/' + evalKeyForWeek();
+}
+
+function subscribeEvalState(){
+  if(evalUnsub) evalUnsub();
+  evalUnsub = fb.onValue(fb.ref(fb.db, evalPath()), (snap) => {
+    const data = snap.exists() ? snap.val() : null;
+    evalState = { roster: (data && data.roster) || [], grades: (data && data.grades) || {} };
+    renderEvaluacion();
+  }, (e) => {
+    evalState = { roster: [], grades: {} };
+    renderEvaluacion();
+  });
+}
+
+async function saveEvalState(){
+  try{ await fb.set(fb.ref(fb.db, evalPath()), JSON.parse(JSON.stringify(evalState))); }
+  catch(e){ /* no crítico */ }
+}
+
+function renderEvaluacion(){
+  const rosterInput = document.getElementById('eval-roster-input');
+  if(rosterInput && document.activeElement !== rosterInput){
+    rosterInput.value = (evalState.roster || []).join('\n');
+  }
+  const wrap = document.getElementById('eval-talleres-wrap');
+  if(!wrap) return;
+  const roster = evalState.roster || [];
+  if(roster.length === 0){
+    wrap.innerHTML = '<div class="note">Añade la lista de alumnos de esta semana arriba para empezar a registrar notas.</div>';
+    return;
+  }
+  wrap.innerHTML = EVAL_TALLERES.map(t => {
+    const cols = t.criterios.map(c => '<th class="crit-h">' + c.label + '<br><span style="color:var(--text-dimmer)">Fila ' + c.fila + '</span></th>').join('');
+    const rows = roster.map(alumno => {
+      const cells = t.criterios.map(c => {
+        const nivelKey = (evalState.grades[t.id] && evalState.grades[t.id][c.id]) ? evalState.grades[t.id][c.id][alumno] : null;
+        const btns = EVAL_NIVELES.map(n => {
+          const active = (n.key === nivelKey) ? 'active ' + n.cls : '';
+          return '<button class="mini-lvl-btn ' + active + '" data-taller="' + t.id + '" data-crit="' + c.id + '" data-alumno="' + encodeURIComponent(alumno) + '" data-nivel="' + n.key + '" title="' + n.full + ' · ' + n.nota + '">' + n.label[0] + '</button>';
+        }).join('');
+        return '<td><div class="mini-lvls">' + btns + '</div></td>';
+      }).join('');
+      return '<tr><td class="alumno-cell">' + alumno + '</td>' + cells + '</tr>';
+    }).join('');
+    return '<div class="taller-block"><h3>' + t.nombre + '</h3><div class="area-sub">' + t.area + '</div>' +
+      '<div style="overflow-x:auto;"><table class="eval-table"><thead><tr><th></th>' + cols + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+  }).join('');
+
+  wrap.querySelectorAll('.mini-lvl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tallerId = btn.dataset.taller, critId = btn.dataset.crit, alumno = decodeURIComponent(btn.dataset.alumno), nivelClicado = btn.dataset.nivel;
+      evalState.grades[tallerId] = evalState.grades[tallerId] || {};
+      evalState.grades[tallerId][critId] = evalState.grades[tallerId][critId] || {};
+      const current = evalState.grades[tallerId][critId][alumno] || null;
+      if(current === nivelClicado){ delete evalState.grades[tallerId][critId][alumno]; }
+      else{ evalState.grades[tallerId][critId][alumno] = nivelClicado; }
+      renderEvaluacion();
+      saveEvalState();
+    });
+  });
+}
+
+document.getElementById('eval-save-roster').addEventListener('click', () => {
+  const raw = document.getElementById('eval-roster-input').value;
+  evalState.roster = raw.split('\n').map(s => s.trim()).filter(Boolean);
+  renderEvaluacion();
+  saveEvalState();
+});
+
+document.getElementById('eval-export-btn').addEventListener('click', () => {
+  const rows = [['Alumno','Taller','Área','Criterio','Fila Excel','Nivel','Nota']];
+  EVAL_TALLERES.forEach(t => {
+    t.criterios.forEach(c => {
+      (evalState.roster || []).forEach(alumno => {
+        const nivelKey = (evalState.grades[t.id] && evalState.grades[t.id][c.id]) ? evalState.grades[t.id][c.id][alumno] : null;
+        if(!nivelKey) return;
+        const nivel = EVAL_NIVELES.find(n => n.key === nivelKey);
+        rows.push([alumno, t.nombre, t.area, c.label, c.fila, nivel.full, nivel.nota]);
+      });
+    });
+  });
+  if(rows.length === 1){ alert('No hay notas registradas todavía.'); return; }
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g,'""') + '"').join(',')).join('\n');
+  const filename = 'evaluacion_miercoles_S' + (typeof currentWeek !== 'undefined' ? currentWeek : 1) + '.csv';
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+});
+
+TABS.push('evaluacion');
+let evalUnlocked = false;
+const evalOverlay = document.getElementById('eval-pin-overlay');
+const evalPinInput = document.getElementById('eval-pin-input');
+const evalPinError = document.getElementById('eval-pin-error');
+
+function tryEvalPin(){
+  if(evalPinInput.value.trim() === '1973'){
+    evalUnlocked = true;
+    evalOverlay.style.display = 'none';
+    evalPinInput.value = '';
+    evalPinError.textContent = '';
+    showTab('evaluacion');
+  }else{
+    evalPinError.textContent = 'Código incorrecto.';
+    evalPinInput.value = '';
+    evalPinInput.focus();
+  }
+}
+document.getElementById('eval-pin-ok').addEventListener('click', tryEvalPin);
+evalPinInput.addEventListener('keydown', (e) => { if(e.key === 'Enter') tryEvalPin(); });
+
+document.getElementById('tab-evaluacion').addEventListener('click', () => {
+  if(evalUnlocked){ showTab('evaluacion'); return; }
+  evalOverlay.style.display = 'flex';
+  evalPinError.textContent = '';
+  evalPinInput.value = '';
+  setTimeout(() => evalPinInput.focus(), 50);
+});
+
+// La suscripción a la evaluación ya se realiza desde loadState() cuando la semana está resuelta.
+</script>
+</body>
+</html>
