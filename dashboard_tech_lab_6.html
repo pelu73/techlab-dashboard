@@ -693,6 +693,14 @@ function rowHtml(w, cycle){
 }
 
 function renderHabitacion(){
+  // Salvaguarda: si por lo que sea llega un estado sin normalizar del todo, lo arreglamos aquí también.
+  if(!state.rooms) state.rooms = {};
+  if(!state.activeRooms || state.activeRooms < 4 || state.activeRooms > 8) state.activeRooms = 8;
+  ROOMS.forEach(r=>{
+    if(!state.rooms[r.id]) state.rooms[r.id] = {};
+    DAYS.forEach(d=>{ if(!(d.id in state.rooms[r.id])) state.rooms[r.id][d.id] = null; });
+  });
+
   // Selector de habitaciones activas
   const picker = document.getElementById('room-count-picker');
   const btns = [4,5,6,7,8].map(n=> `<button class="count-btn${state.activeRooms===n?' active':''}" data-n="${n}">${n}</button>`).join('');
@@ -840,11 +848,26 @@ function addBonus(team, amount, reason){
   saveState();
 }
 
+function showRenderError(fnName, err){
+  console.error('Error en ' + fnName, err);
+  let box = document.getElementById('render-error-box');
+  if(!box){
+    box = document.createElement('div');
+    box.id = 'render-error-box';
+    box.style.cssText = 'position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;background:#3a0e12;border:1px solid #ff5c6a;color:#ffd7da;padding:12px 14px;border-radius:10px;font-family:monospace;font-size:12px;white-space:pre-wrap;box-shadow:0 8px 24px rgba(0,0,0,.5);max-height:40vh;overflow:auto;';
+    document.body.appendChild(box);
+  }
+  box.textContent = '⚠️ Error al dibujar "' + fnName + '":\n' + (err && err.message ? err.message : String(err)) + (err && err.stack ? '\n\n' + err.stack : '');
+}
+
+window.addEventListener('error', (e)=>{ try{ showRenderError('Error general', e.error || e.message); }catch(_e){} });
+window.addEventListener('unhandledrejection', (e)=>{ try{ showRenderError('Promesa fallida', e.reason); }catch(_e){} });
+
 function render(){
-  renderMarcador();
-  renderSeguimiento();
-  renderBonus();
-  renderHabitacion();
+  try{ renderMarcador(); }catch(e){ showRenderError('Marcador', e); }
+  try{ renderSeguimiento(); }catch(e){ showRenderError('Seguimiento', e); }
+  try{ renderBonus(); }catch(e){ showRenderError('Bonus', e); }
+  try{ renderHabitacion(); }catch(e){ showRenderError('Habitación', e); }
 }
 
 // Tabs
