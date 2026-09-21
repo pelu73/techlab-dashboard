@@ -522,6 +522,10 @@ function normalizeState(s){
   TEAMS.forEach(t=>{
     if(!s[t.id]) s[t.id] = {};
     if(!s[t.id].bonus) s[t.id].bonus = { total:0, log:[] };
+    // Firebase elimina los arrays/objetos vacíos al guardarlos (p.ej. log:[] sin usar),
+    // así que hay que reconstruirlos aunque "bonus" ya exista.
+    if(!Array.isArray(s[t.id].bonus.log)) s[t.id].bonus.log = [];
+    if(typeof s[t.id].bonus.total !== 'number') s[t.id].bonus.total = 0;
     GRADED.forEach(w=>{ if(!s[t.id][w.id]) s[t.id][w.id] = 'pendiente'; });
     ATTENDANCE.forEach(w=>{ if(!s[t.id][w.id]) s[t.id][w.id] = 'pendiente'; });
   });
@@ -804,6 +808,12 @@ function renderHabitacion(){
 }
 
 function renderBonus(){
+  TEAMS.forEach(t=>{
+    if(!state[t.id]) state[t.id] = {};
+    if(!state[t.id].bonus) state[t.id].bonus = { total:0, log:[] };
+    if(!Array.isArray(state[t.id].bonus.log)) state[t.id].bonus.log = [];
+    if(typeof state[t.id].bonus.total !== 'number') state[t.id].bonus.total = 0;
+  });
   const grid = document.getElementById('bonus-grid');
   grid.innerHTML = TEAMS.map(t=>{
     const b = state[t.id].bonus;
